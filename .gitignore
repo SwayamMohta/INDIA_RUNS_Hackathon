@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.ipynb_checkpoints
+.pytest_cache/
+
+# Exclude large data files
+input/candidates.jsonl
+input/bm25_index.pkl
+
+# Exclude final outputs
+output/submission.csv
