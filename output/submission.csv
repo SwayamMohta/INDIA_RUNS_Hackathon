@@ -1,0 +1,101 @@
+candidate_id,rank,score,reasoning
+CAND_0077337,1,0.6875,"Strong fit: 7yr Staff Machine Learning Engineer with production retrieval/recommendation experience at Paytm, bringing Semantic Search, pgvector. Highly active (95% response) and open to work."
+CAND_0096142,2,0.6497,"Strong fit: 5yr Applied ML Engineer with production retrieval/recommendation experience at upGrad, bringing Weaviate, Pinecone, Python. Highly active (84% response) and open to work."
+CAND_0098454,3,0.6392,"Adaptive profile: 7yr AI Specialist with product engineering experience at Meesho alongside some service-firm work, showing OpenSearch competency."
+CAND_0002025,4,0.6341,"Strong fit: 6yr Senior AI Engineer with production retrieval/recommendation experience at Apple, bringing FAISS, TensorFlow, OpenSearch. Highly active (80% response) and open to work."
+CAND_0074225,5,0.6193,"Strong fit: 4yr Machine Learning Engineer with production retrieval/recommendation experience at Unacademy, bringing Recommendation Systems, Elasticsearch. Highly active (91% response) and open to work."
+CAND_0094482,6,0.6071,"High-potential candidate: 6yr Junior ML Engineer with solid MLOps depth at Zomato, currently based in Singapore but actively looking to relocate."
+CAND_0053591,7,0.6022,Strong profile: 5yr AI Engineer with solid Embeddings depth from Ola; based in Toronto but open to relocation with high responsiveness.
+CAND_0064326,8,0.602,"Strong fit: 8yr Search Engineer with production retrieval/recommendation experience at Freshworks, bringing Deep Learning, Semantic Search. Highly active (94% response) and open to work."
+CAND_0030031,9,0.5852,"Strong fit: 6yr AI Engineer with production retrieval/recommendation experience at Microsoft, bringing Information Retrieval, NLP. Highly active (94% response) and open to work."
+CAND_0050876,10,0.5831,"Strong fit: 6yr Applied ML Engineer with production retrieval/recommendation experience at Freshworks, bringing MLOps, FAISS. Highly active (67% response) and open to work."
+CAND_0036184,11,0.5777,"Strong match: 6yr Recommendation Systems Engineer who deployed retrieval and recommendation systems at CRED, matching the JD's core vector search and ranking requirements."
+CAND_0064256,12,0.5777,"Tier-1 background: 6yr developer with tenure at high-profile firms like BYJU'S, well-versed in production ML lifecycle, scalable search and Hugging Face Transformers."
+CAND_0019480,13,0.5697,"Promising talent: 2.8yr engineer with rapid progression and LLMs, TensorFlow expertise at Meesho, showing strong aptitude despite being on the edge of the ideal experience band."
+CAND_0018549,14,0.5647,"Strong match: 7yr Recommendation Systems Engineer who deployed retrieval and recommendation systems at Uber, matching the JD's core vector search and ranking requirements."
+CAND_0075249,15,0.5637,"Strong match: 6yr Applied ML Engineer who deployed retrieval and recommendation systems at Zomato, matching the JD's core vector search and ranking requirements."
+CAND_0018499,16,0.5618,"Strong match: 7yr Senior Machine Learning Engineer who deployed retrieval and recommendation systems at Zomato, matching the JD's core vector search and ranking requirements."
+CAND_0079387,17,0.5554,"Strong match: 7yr AI Engineer who deployed retrieval and recommendation systems at Microsoft, matching the JD's core vector search and ranking requirements."
+CAND_0052682,18,0.5552,"Strong match: 7yr NLP Engineer who deployed retrieval and recommendation systems at Salesforce, matching the JD's core vector search and ranking requirements."
+CAND_0069638,19,0.5551,"Strong match: 6yr Computer Vision Engineer who deployed retrieval and recommendation systems at Swiggy, matching the JD's core vector search and ranking requirements."
+CAND_0081053,20,0.5515,"Strong match: 5yr NLP Engineer who deployed retrieval and recommendation systems at Salesforce, matching the JD's core vector search and ranking requirements."
+CAND_0054546,21,0.5457,"Tier-1 background: 5yr developer with tenure at high-profile firms like Razorpay, well-versed in production ML lifecycle, scalable search and Forecasting, Qdrant, Reinforcement Learning."
+CAND_0060340,22,0.5447,"Strong match: 6yr Computer Vision Engineer who deployed retrieval and recommendation systems at CRED, matching the JD's core vector search and ranking requirements."
+CAND_0033445,23,0.544,"Tier-1 background: 7yr developer with tenure at high-profile firms like Vedantu, well-versed in production ML lifecycle, scalable search and Information Retrieval, Semantic Search."
+CAND_0075574,24,0.542,"Balanced background: 6yr developer combining service firm execution discipline with recent product engineering at Haptik, featuring solid pgvector, Recommendation Systems, OpenSearch skills."
+CAND_0065786,25,0.5373,"Strong match: 5yr AI Specialist who deployed retrieval and recommendation systems at Swiggy, matching the JD's core vector search and ranking requirements."
+CAND_0094292,26,0.533,"Tier-1 background: 6yr developer with tenure at high-profile firms like Vedantu, well-versed in production ML lifecycle, scalable search and PyTorch."
+CAND_0004402,27,0.5299,"Strong match: 6yr AI Research Engineer who deployed retrieval and recommendation systems at Zomato, matching the JD's core vector search and ranking requirements."
+CAND_0081846,28,0.5294,"Strong match: 7yr Lead AI Engineer who deployed retrieval and recommendation systems at Razorpay, matching the JD's core vector search and ranking requirements."
+CAND_0065195,29,0.5293,"Strong match: 5yr Search Engineer who deployed retrieval and recommendation systems at CRED, matching the JD's core vector search and ranking requirements."
+CAND_0090300,30,0.5277,"High-potential candidate: 5yr AI Research Engineer with solid Fine-tuning LLMs depth at Freshworks, currently based in San Francisco but actively looking to relocate."
+CAND_0053527,31,0.5256,"Mid-tier fit: 7yr Junior ML Engineer at PhonePe with search/ranking project exposure, though has slightly less evidence of end-to-end product ownership."
+CAND_0043637,32,0.5255,"Service firm background: 6yr developer at Rephrase.ai with a history of consulting roles, but has some product exposure and technical skills like PyTorch."
+CAND_0055960,33,0.525,"Geographically distant: competent 5yr developer with relevant Machine Learning, PyTorch expertise, but based in San Francisco which may present logistics challenges."
+CAND_0081686,34,0.524,"Geographically distant: competent 6yr developer with relevant Machine Learning, Embeddings, FAISS expertise, but based in Austin which may present logistics challenges."
+CAND_0033179,35,0.5223,"Service firm background: 7yr developer at Wipro with a history of consulting roles, but has some product exposure and technical skills like OpenSearch, Fine-tuning LLMs, Information Retrieval."
+CAND_0095528,36,0.5211,"Mid-tier fit: 5yr Senior Data Scientist at Netflix with search/ranking project exposure, though has slightly less evidence of end-to-end product ownership."
+CAND_0054100,37,0.5204,"Solid pedigree: 6yr engineer with product company exposure (incl. Zoho), but the profile shows a more generalist software engineering focus than specialized ML/RAG."
+CAND_0054123,38,0.5191,"Mid-tier fit: 5yr Applied ML Engineer at Meta with search/ranking project exposure, though has slightly less evidence of end-to-end product ownership."
+CAND_0009691,39,0.5181,"Service firm background: 6yr developer at LinkedIn with a history of consulting roles, but has some product exposure and technical skills like Recommendation Systems, Fine-tuning LLMs."
+CAND_0077285,40,0.5177,"Mid-tier fit: 6yr Recommendation Systems Engineer at Nykaa with search/ranking project exposure, though has slightly less evidence of end-to-end product ownership."
+CAND_0072688,41,0.5164,"Engaged applicant: 7yr Data Scientist showing great platform activity and quick responsiveness, though core ML/search domain experience is moderate."
+CAND_0082086,42,0.5161,"Solid pedigree: 6yr engineer with product company exposure (incl. Razorpay), but the profile shows a more generalist software engineering focus than specialized ML/RAG."
+CAND_0005260,43,0.5152,"Mid-tier fit: 5yr Senior NLP Engineer at Netflix with search/ranking project exposure, though has slightly less evidence of end-to-end product ownership."
+CAND_0042506,44,0.5134,"Mid-tier fit: 4yr Search Engineer at Verloop.io with search/ranking project exposure, though has slightly less evidence of end-to-end product ownership."
+CAND_0029367,45,0.5124,"Mid-tier fit: 6yr Senior Data Scientist at Rephrase.ai with search/ranking project exposure, though has slightly less evidence of end-to-end product ownership."
+CAND_0012837,46,0.5123,"Mid-tier fit: 6yr Junior ML Engineer at Sarvam AI with search/ranking project exposure, though has slightly less evidence of end-to-end product ownership."
+CAND_0016659,47,0.5101,"Mid-tier fit: 4yr ML Engineer at Glance with search/ranking project exposure, though has slightly less evidence of end-to-end product ownership."
+CAND_0044262,48,0.5087,"Service firm background: 7yr developer at upGrad with a history of consulting roles, but has some product exposure and technical skills like OpenSearch."
+CAND_0066376,49,0.5062,"Mid-tier fit: 6yr Applied ML Engineer at Dream11 with search/ranking project exposure, though has slightly less evidence of end-to-end product ownership."
+CAND_0044222,50,0.5052,"Mid-tier fit: 8yr AI Engineer at PolicyBazaar with search/ranking project exposure, though has slightly less evidence of end-to-end product ownership."
+CAND_0071974,51,0.5041,"Mid-tier fit: 8yr Senior AI Engineer at Netflix with search/ranking project exposure, though has slightly less evidence of end-to-end product ownership."
+CAND_0011162,52,0.5038,"Mid-tier fit: 6yr Recommendation Systems Engineer at upGrad with search/ranking project exposure, though has slightly less evidence of end-to-end product ownership."
+CAND_0064904,53,0.5035,"Mid-tier fit: 5yr AI Engineer at LinkedIn with search/ranking project exposure, though has slightly less evidence of end-to-end product ownership."
+CAND_0040887,54,0.5029,"Geographically distant: competent 5yr developer with relevant FAISS expertise, but based in Toronto which may present logistics challenges."
+CAND_0066690,55,0.5027,"Service firm background: 5yr developer at Freshworks with a history of consulting roles, but has some product exposure and technical skills like Hugging Face Transformers, TensorFlow."
+CAND_0030784,56,0.5005,"Engaged applicant: 4yr Data Scientist showing great platform activity and quick responsiveness, though core ML/search domain experience is moderate."
+CAND_0043860,57,0.4978,"Mid-tier fit: 6yr Junior ML Engineer at Aganitha with search/ranking project exposure, though has slightly less evidence of end-to-end product ownership."
+CAND_0020991,58,0.4973,"Mid-tier fit: 5yr Junior ML Engineer at PhonePe with search/ranking project exposure, though has slightly less evidence of end-to-end product ownership."
+CAND_0024466,59,0.4966,"Geographically distant: competent 5yr developer with relevant Recommendation Systems, pgvector expertise, but based in Toronto which may present logistics challenges."
+CAND_0057563,60,0.4957,"Mid-tier fit: 7yr NLP Engineer at Locobuzz with search/ranking project exposure, though has slightly less evidence of end-to-end product ownership."
+CAND_0073314,61,0.4953,"Limited technical match: 5.2yr developer at Aganitha listing basic AI skills, but lacking verified hands-on implementation or deep coding activity."
+CAND_0050454,62,0.4944,Lower-tier candidate: 6.8yr developer at Rephrase.ai showing limited domain shipping evidence and weak overall alignment with JD-specific search requirements.
+CAND_0061265,63,0.4927,Lower-tier candidate: 6.6yr developer at Zoho showing limited domain shipping evidence and weak overall alignment with JD-specific search requirements.
+CAND_0086022,64,0.4918,Lower-tier candidate: 5.3yr developer at Sarvam AI showing limited domain shipping evidence and weak overall alignment with JD-specific search requirements.
+CAND_0044883,65,0.4871,"Relocation required: 6.3yr developer based in Berlin with weaker JD alignment and extended notice period, making hiring logistics unfavorable."
+CAND_0013613,66,0.487,"Relocation required: 4.7yr developer based in Singapore with weaker JD alignment and extended notice period, making hiring logistics unfavorable."
+CAND_0070202,67,0.487,Lower-tier candidate: 5.1yr developer at BYJU'S showing limited domain shipping evidence and weak overall alignment with JD-specific search requirements.
+CAND_0076163,68,0.4866,Lower-tier candidate: 6.9yr developer at Ola showing limited domain shipping evidence and weak overall alignment with JD-specific search requirements.
+CAND_0084819,69,0.4861,Lower-tier candidate: 4.5yr developer at Dream11 showing limited domain shipping evidence and weak overall alignment with JD-specific search requirements.
+CAND_0091909,70,0.4849,Lower-tier candidate: 6.9yr developer at Rephrase.ai showing limited domain shipping evidence and weak overall alignment with JD-specific search requirements.
+CAND_0041669,71,0.4815,Lower-tier candidate: 8.0yr developer at CRED showing limited domain shipping evidence and weak overall alignment with JD-specific search requirements.
+CAND_0040117,72,0.48,Lower-tier candidate: 6.5yr developer at PhonePe showing limited domain shipping evidence and weak overall alignment with JD-specific search requirements.
+CAND_0024990,73,0.4794,"Consulting focus: 5.2yr developer whose career history is primarily in services/consulting, showing lower product-ratio and limited relevancy to Series A product engineering."
+CAND_0079064,74,0.4793,Lower-tier candidate: 5.2yr developer at Niramai showing limited domain shipping evidence and weak overall alignment with JD-specific search requirements.
+CAND_0046064,75,0.479,Lower-tier candidate: 8.9yr developer at Salesforce showing limited domain shipping evidence and weak overall alignment with JD-specific search requirements.
+CAND_0008425,76,0.4777,Lower-tier candidate: 7.8yr developer at Ola showing limited domain shipping evidence and weak overall alignment with JD-specific search requirements.
+CAND_0010257,77,0.4773,Lower-tier candidate: 6.5yr developer at Google showing limited domain shipping evidence and weak overall alignment with JD-specific search requirements.
+CAND_0038206,78,0.4765,Junior profile: 3.5yr engineer with insufficient YOE (3.5 years) and minimal exposure to shipping production-level machine learning models.
+CAND_0068811,79,0.4762,Lower-tier candidate: 8.0yr developer at Freshworks showing limited domain shipping evidence and weak overall alignment with JD-specific search requirements.
+CAND_0077498,80,0.4751,"Consulting focus: 5.4yr developer whose career history is primarily in services/consulting, showing lower product-ratio and limited relevancy to Series A product engineering."
+CAND_0070514,81,0.4747,"Inactive profile: 5.5yr AI Specialist with low response rates and profile activity, suggesting limited availability despite moderate OpenSearch background."
+CAND_0039838,82,0.4745,Lower-tier candidate: 4.9yr developer at Amazon showing limited domain shipping evidence and weak overall alignment with JD-specific search requirements.
+CAND_0002120,83,0.4736,"Relocation required: 6.5yr developer based in Berlin with weaker JD alignment and extended notice period, making hiring logistics unfavorable."
+CAND_0028422,84,0.4735,Lower-tier candidate: 5.5yr developer at Yellow.ai showing limited domain shipping evidence and weak overall alignment with JD-specific search requirements.
+CAND_0015065,85,0.4724,Junior profile: 3.9yr engineer with insufficient YOE (3.9 years) and minimal exposure to shipping production-level machine learning models.
+CAND_0013536,86,0.4722,Lower-tier candidate: 14.1yr developer at Haptik showing limited domain shipping evidence and weak overall alignment with JD-specific search requirements.
+CAND_0001610,87,0.4712,Junior profile: 3.0yr engineer with insufficient YOE (3.0 years) and minimal exposure to shipping production-level machine learning models.
+CAND_0093912,88,0.4704,Lower-tier candidate: 5.3yr developer at Razorpay showing limited domain shipping evidence and weak overall alignment with JD-specific search requirements.
+CAND_0078002,89,0.4695,"Consulting focus: 6.3yr developer whose career history is primarily in services/consulting, showing lower product-ratio and limited relevancy to Series A product engineering."
+CAND_0062247,90,0.4675,Lower-tier candidate: 7.3yr developer at Google showing limited domain shipping evidence and weak overall alignment with JD-specific search requirements.
+CAND_0088025,91,0.4668,"Consulting focus: 8.6yr developer whose career history is primarily in services/consulting, showing lower product-ratio and limited relevancy to Series A product engineering."
+CAND_0006418,92,0.466,Lower-tier candidate: 5.7yr developer at Verloop.io showing limited domain shipping evidence and weak overall alignment with JD-specific search requirements.
+CAND_0000031,93,0.4659,Lower-tier candidate: 6.0yr developer at Swiggy showing limited domain shipping evidence and weak overall alignment with JD-specific search requirements.
+CAND_0041610,94,0.4649,Lower-tier candidate: 6.7yr developer at Zoho showing limited domain shipping evidence and weak overall alignment with JD-specific search requirements.
+CAND_0099806,95,0.4646,Lower-tier candidate: 4.6yr developer at Mad Street Den showing limited domain shipping evidence and weak overall alignment with JD-specific search requirements.
+CAND_0005538,96,0.4636,Lower-tier candidate: 5.9yr developer at Adobe showing limited domain shipping evidence and weak overall alignment with JD-specific search requirements.
+CAND_0042100,97,0.4631,"Relocation required: 7.3yr developer based in Singapore with weaker JD alignment and extended notice period, making hiring logistics unfavorable."
+CAND_0006557,98,0.4623,Lower-tier candidate: 7.9yr developer at Paytm showing limited domain shipping evidence and weak overall alignment with JD-specific search requirements.
+CAND_0028793,99,0.4623,Lower-tier candidate: 7.2yr developer at Google showing limited domain shipping evidence and weak overall alignment with JD-specific search requirements.
+CAND_0052712,100,0.4622,Junior profile: 3.1yr engineer with insufficient YOE (3.1 years) and minimal exposure to shipping production-level machine learning models.
