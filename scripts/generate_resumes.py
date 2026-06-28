@@ -1,6 +1,7 @@
 import csv
 import json
 import os
+import sys
 from tqdm import tqdm  # type: ignore
 
 def main():
@@ -8,6 +9,8 @@ def main():
     final_dir = os.path.dirname(scripts_dir)
     csv_path = os.path.join(final_dir, "output/submission.csv")
     candidates_jsonl = os.path.join(final_dir, "input/candidates.jsonl")
+    if "--candidates" in sys.argv:
+        candidates_jsonl = sys.argv[sys.argv.index("--candidates") + 1]
     output_dir = os.path.join(final_dir, "output/top_100_resumes")
 
     # 1. Create output directory

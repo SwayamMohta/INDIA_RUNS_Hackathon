@@ -44,8 +44,10 @@ def compute_synthetic_relevance(row, bm25_score):
     hp_mult = float(row.get("honeypot_multiplier", 1.0))
     is_honeypot = hp_mult == 0.0 or hp_mult < SUSPICIOUS_HONEYPOT_THRESHOLD
     is_inactive = float(row.get("behavioral_recency_score", 0.0)) < 0.05
-    
-    if is_disqualified or is_consulting or is_honeypot or is_inactive:
+    # JD explicitly rejects CV/speech/robotics-primary profiles with thin NLP/IR.
+    is_off_domain = float(row.get("risk_domain_mismatch_score", 0.0)) > 0.65
+
+    if is_disqualified or is_consulting or is_honeypot or is_inactive or is_off_domain:
         return 0
 
     # ── Compute Technical Fit Score ──────────────────────────────
@@ -89,10 +91,12 @@ def main():
     print("Training LightGBM LambdaMART Ranker (Improved)")
     print("=" * 60)
 
-    # Look for data directory relative to project root (parent of scripts/)
+    # Data directory: --data <dir>, else default to project_root/input.
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(script_dir)
     data_dir = os.path.join(project_root, "input")
+    if "--data" in sys.argv:
+        data_dir = sys.argv[sys.argv.index("--data") + 1]
     
     # ── Step 1: Load precomputed data ────────────────────────────
     bm25_path = os.path.join(data_dir, "bm25_index.pkl")
@@ -158,39 +162,41 @@ def main():
     X = train_df[feature_cols].astype(float).values
     y = labels
     
-    # ── Step 5: Create multiple query groups ─────────────────────
-    # LambdaMART works best with many smaller query groups
-    # Partition candidates into random groups of ~500 each
+    # ── Step 5: Few large representative query groups ────────────
+    # This is a single-query ranking problem (every candidate is scored against the
+    # SAME JD). The original used random 500-item groups, which only let LambdaMART
+    # compare candidates within tiny subsets — discarding most ordering signal and
+    # injecting noise. The ideal is one group over the whole list, but LightGBM caps
+    # a query group at 10,000 rows, so we use a few LARGE groups (~8k) instead. After
+    # a global shuffle each group is a representative random sample of the full tier
+    # mix, so within-group pairwise comparisons approximate the global ranking — far
+    # more comparisons per group than 500, while respecting LightGBM's per-query cap.
     n_total = len(X)
-    group_size = 500
-    n_groups = max(1, n_total // group_size)
-    
-    # Shuffle data (important for random group assignment)
+    GROUP_SIZE = 8000  # <= LightGBM's 10,000 per-query limit
+
+    # Shuffle once so every group (and the held-out val slice) is representative.
     np.random.seed(42)
     shuffle_idx = np.random.permutation(n_total)
     X = X[shuffle_idx]
     y = y[shuffle_idx]
-    
-    # Create group sizes
-    groups = [group_size] * n_groups
-    remainder = n_total - group_size * n_groups
+
+    n_groups = max(1, n_total // GROUP_SIZE)
+    groups = [GROUP_SIZE] * n_groups
+    remainder = n_total - GROUP_SIZE * n_groups
     if remainder > 0:
         groups.append(remainder)
-    
-    print(f"  Created {len(groups)} query groups (avg size: {np.mean(groups):.0f})")
-    
-    # ── Step 6: Train/Val split ──────────────────────────────────
-    # Use last 20% of groups as validation
+    print(f"  Created {len(groups)} query groups (size ~{GROUP_SIZE})")
+
+    # ── Step 6: Train/Val split (whole groups → validation) ──────
     n_val_groups = max(1, len(groups) // 5)
     n_train_groups = len(groups) - n_val_groups
-    
     train_end = sum(groups[:n_train_groups])
-    
+
     X_train, X_val = X[:train_end], X[train_end:]
     y_train, y_val = y[:train_end], y[train_end:]
     groups_train = groups[:n_train_groups]
     groups_val = groups[n_train_groups:]
-    
+
     print(f"  Train: {len(X_train)} candidates in {len(groups_train)} groups")
     print(f"  Val:   {len(X_val)} candidates in {len(groups_val)} groups")
     

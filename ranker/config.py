@@ -108,6 +108,42 @@ PRODUCTION_KEYWORDS = [
 ]
 
 # ─────────────────────────────────────────────
+# DOMAIN-MISMATCH SIGNALS
+# JD explicitly does NOT want candidates whose primary expertise is computer
+# vision / speech / robotics WITHOUT significant NLP/IR exposure. We measure the
+# balance of evidence and apply a graded penalty (not a hard zero).
+# ─────────────────────────────────────────────
+# NOTE: keyword matching is substring-based, so short/common tokens that collide with
+# unrelated words (e.g. "gan" in "began", "visual" in "visualization", "ros" in "across")
+# are deliberately excluded — only specific, low-collision CV/speech/robotics terms.
+CV_KEYWORDS = [
+    "computer vision", "image classification", "object detection", "image segmentation",
+    "semantic segmentation", "opencv", "resnet", "yolo", "image moderation",
+    "face recognition", "facial recognition", "pose estimation",
+    "generative adversarial", "diffusion model", "diffusion models", "optical character",
+    "image generation", "imagenet", "u-net", "medical imaging", "image recognition",
+]
+SPEECH_KEYWORDS = [
+    "speech recognition", "speech-to-text", "text-to-speech", "speech synthesis",
+    "wav2vec", "acoustic model", "speaker recognition", "audio classification", "phoneme",
+]
+ROBOTICS_KEYWORDS = [
+    "robotics", "robot operating system", "slam", "motion planning", "lidar",
+    "autonomous navigation", "kinematics",
+]
+# Positive in-domain evidence (NLP / information retrieval / ranking / LLM / recsys)
+NLP_IR_KEYWORDS = [
+    "nlp", "natural language", "text classification", "named entity",
+    "sentiment", "question answering", "summarization", "machine translation",
+    "language model", "llm", "retrieval augmented", "transformer", "bert",
+    "information retrieval", "semantic search", "ranking", "reranking",
+    "learning to rank", "recommendation", "recommender", "embedding", "embeddings",
+    "vector search", "faiss", "milvus", "weaviate", "pinecone", "qdrant",
+    "elasticsearch", "opensearch", "bm25", "dense retrieval", "fine-tuning",
+    "fine tuning", "sentence transformers", "document classification",
+]
+
+# ─────────────────────────────────────────────
 # COMPANY TIER CLASSIFICATION
 # ─────────────────────────────────────────────
 
@@ -145,6 +181,9 @@ SERVICE_FIRMS = {
     "niit technologies", "zensar", "mssl", "birlasoft", "cyient",
     "persistent systems",  # borderline — keep low
     "deloitte", "pwc", "kpmg", "ey", "ernst young", "mckinsey", "bain", "bcg",
+    # BPO / managed-services / staffing shops (often dress up as "AI" arms)
+    "genpact", "wns", "exlservice", "exl service", "firstsource", "teleperformance",
+    "conduent", "sutherland", "wipro digital", "infosys bpm", "concentrix",
 }
 
 # ─────────────────────────────────────────────
@@ -215,9 +254,25 @@ WEIGHTS = {
 # Multiplier caps (applied after weighted sum)
 HONEYPOT_MULTIPLIER = 0.0          # guaranteed lowest tier
 KEYWORD_STUFFER_MULTIPLIER = 0.3   # strong penalty
-CONSULTING_ONLY_MULTIPLIER = 0.4   # career in service firms only
+CONSULTING_ONLY_MULTIPLIER = 0.4   # career entirely in service firms (floor of the graded penalty)
 DISQUALIFYING_TITLE_MULTIPLIER = 0.0  # wrong domain entirely → hard filter
 SUSPICIOUS_HONEYPOT_THRESHOLD = 0.5   # candidates with hp_mult below this are dropped
+
+# Domain-mismatch (CV / speech / robotics primary, thin NLP/IR) — graded penalty.
+# domain_mismatch_score in [0,1]; final multiplier interpolates between these bounds.
+CV_MISMATCH_FLOOR = 0.40           # strongest penalty when fully CV/speech-dominant w/ no NLP/IR
+CV_MISMATCH_CEIL = 1.0             # no penalty when in-domain
+CV_MISMATCH_TRIGGER = 0.45         # only penalize when domain_mismatch_score exceeds this
+# Explicit CV/speech/robotics job titles are an unambiguous domain declaration; force a
+# strong mismatch for them UNLESS they also show significant NLP/IR work (the JD carve-out).
+CV_TITLE_TERMS = ("computer vision", "speech", "robotics")
+CV_TITLE_FORCED_MISMATCH = 0.80
+CV_TITLE_NLP_EXEMPTION_HITS = 5    # >= this many NLP/IR work-hits exempts a CV-titled candidate
+
+# Title-chaser (job-hops for title every ~year) — mild penalty.
+TITLE_CHASER_MIN_ROLES = 4
+TITLE_CHASER_MAX_AVG_TENURE_MONTHS = 18
+TITLE_CHASER_MULTIPLIER = 0.85
 
 # ─────────────────────────────────────────────
 # EXPERIENCE RANGE
