@@ -119,3 +119,56 @@ Removed the stale `output/test_submission.csv` (an old 50-candidate sample run).
 Synthetic labels are skewed (≈74.6% tier-0; only 45 tier-3) and derived from the same features
 the model sees, so the LTR is bounded by label quality. The graded penalties above are the
 high-confidence wins; deeper de-circularization would require ground-truth labels (not provided).
+
+---
+
+# Round 2 — Inference-only sandbox + standalone ranking
+
+This round makes the system genuinely **inference-only at reproduction/sandbox time** and
+adds the required §10.5 hosted demo. The committed ranking is unchanged.
+
+**Verified (all reproduce `output/submission.csv` byte-for-byte):**
+- Full run from precomputed artifacts: ~17 s.
+- Fresh-clone run (no `bm25_index.pkl`; rebuilt from `candidates.jsonl`): ~42 s.
+- Standalone run on the 50-candidate sample (features computed on the fly, trained model
+  applied): ~1.2 s, validator-clean, 0 honeypots.
+
+**`ranker/feature_frame.py` (new)** — single source of truth that turns raw candidate dicts
+into the model's feature DataFrame. Used by both `precompute.py` (full pool, offline) and
+`rank.py` (`--standalone`, on the fly), guaranteeing identical feature construction.
+
+**`rank.py`**
+- New `--standalone` flag: computes features on the fly for `--candidates` (or `--sample`)
+  and applies the **trained** `ltr_model.txt`, ignoring any precomputed parquet/pickle. This
+  is the path the sandbox uses to rank a ≤100 sample end-to-end with **no training and no
+  full precompute**. Previously the only on-the-fly path was the *heuristic* scorer, so a
+  small sample could not exercise the real model.
+- LTR model is now loaded by a dedicated `load_ltr_model()` (independent of the feature
+  matrix); robust `load_candidates_any()` handles JSON-array, single-object, and JSONL input.
+- Feature alignment uses `reindex(columns=...)` so an on-the-fly sample never crashes on a
+  missing column.
+
+**`precompute.py`** — refactored to call `build_feature_frame()` (DRY; behaviour identical).
+
+**`sandbox/` (new)** — HuggingFace Space (Gradio): `app.py` (upload ≤100 / use bundled
+sample → ranked CSV), `README.md` (Space header), `requirements.txt`, and `build_space.py`
+which assembles a 0.76 MB self-contained Space (app + ranker + rank.py + trained model only;
+no parquet/pickle). The app shells out to the documented `rank.py --standalone` command.
+
+**`Dockerfile` + `.dockerignore` (new)** — inference-only image (ENTRYPOINT = `rank.py`) for
+the §10.5 Docker fallback / Stage-3 reproduction.
+
+**Docs** — `README.md` rewritten (single-command reproduction; explicit inference-vs-training
+table; sandbox section). `submission_metadata.yaml` reproduce-command simplified to the single
+`rank.py` call; `sandbox_link` points to the HF Space. `SUBMISSION_GUIDE.md` (new) is the
+end-to-end submission checklist.
+
+**Removed** — `pyproject.toml` (IDE-only pyrefly config, not a dependency spec),
+`scripts/read_docs.py` and `scripts/inspect_sub.py` (dev throwaways; the latter referenced a
+deleted file). The repo was also relocated out of a temporary directory into the project root.
+
+**Resolved from the Round-1 TODO:** the verification reports already match the current
+ranking; the sandbox now exists. **Still required before submitting** (cannot be done from
+code): fill `phone` + the second member's email in `submission_metadata.yaml`, deploy the HF
+Space and paste its URL into `sandbox_link`, and complete the GitHub push + branch finalisation
+(see `SUBMISSION_GUIDE.md`).

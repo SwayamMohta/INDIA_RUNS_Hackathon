@@ -5,6 +5,13 @@ __pycache__/
 .ipynb_checkpoints
 .pytest_cache/
 
+# Competition bundle (organizer-provided) and local tooling — not part of the submission repo.
+data/
+.claude/
+
+# Assembled HuggingFace Space (build artifact of sandbox/build_space.py).
+sandbox/_space/
+
 # Raw candidate pool — large, supplied by organizers at reproduction time.
 input/candidates.jsonl
 

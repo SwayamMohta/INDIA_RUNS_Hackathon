@@ -59,11 +59,18 @@ def parse_args():
     )
     parser.add_argument(
         "--sample", action="store_true",
-        help="Use sample_candidates.json instead (for testing)"
+        help="Use the bundled sample_candidates.json (implies --standalone)"
+    )
+    parser.add_argument(
+        "--standalone", action="store_true",
+        help="Inference-only mode: compute features on the fly from --candidates using the "
+             "TRAINED LTR model, ignoring any precomputed feature matrix / BM25 pickle. This "
+             "is what the sandbox uses to rank a small (<=100) sample end-to-end without "
+             "re-running precompute.py or train_ltr.py."
     )
     parser.add_argument(
         "--data", default="data",
-        help="Directory containing precomputed artifacts (default: data/)"
+        help="Directory containing the trained model + precomputed artifacts (default: data/)"
     )
     parser.add_argument(
         "--output", "--out", default="submission.csv",
@@ -98,6 +105,57 @@ def load_precomputed(data_dir: str):
         bm25_model, candidate_ids = load_bm25_artifacts(data_dir)
 
     return bm25_model, candidate_ids, features_df
+
+
+def load_ltr_model(data_dir: str):
+    """Load the trained LightGBM LTR model and its feature list, if present.
+
+    This is decoupled from any precomputed feature matrix: the model + feature
+    list are committed to the repo, so they are available for both the full-pool
+    run and the standalone sandbox run. Returns (model, feature_names) or (None, None).
+    """
+    model_path = os.path.join(data_dir, "ltr_model.txt")
+    feature_names_path = os.path.join(data_dir, "feature_names.json")
+    if not (os.path.exists(model_path) and os.path.exists(feature_names_path)):
+        return None, None
+    import lightgbm as lgb
+    print(f"[rank] Loading trained LTR model from {model_path}...")
+    model = lgb.Booster(model_file=model_path)
+    with open(feature_names_path, "r") as f:
+        feature_names = json.load(f)
+    return model, feature_names
+
+
+def _resolve_sample_path(path: str) -> str:
+    """Find the bundled sample candidates file from any reasonable CWD."""
+    if path and path != "candidates.jsonl" and os.path.exists(path):
+        return path
+    for cand in (
+        os.path.join("input", "sample_candidates.json"),
+        "sample_candidates.json",
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "input", "sample_candidates.json"),
+    ):
+        if os.path.exists(cand):
+            return cand
+    raise FileNotFoundError("Could not locate sample_candidates.json (looked in ./input and ./).")
+
+
+def load_candidates_any(path: str, sample: bool):
+    """Load candidates from a JSON array, a single JSON object, or JSONL.
+
+    The sandbox/sample inputs are small JSON arrays; the full pool is JSONL. We
+    pick the parser by extension to avoid slurping the 487 MB JSONL into json.load.
+    """
+    if sample:
+        path = _resolve_sample_path(path)
+    if path.endswith(".jsonl"):
+        return list(tqdm(stream_candidates(path), desc="Loading candidates", unit="cand"))
+    # .json (array or single object) — sandbox uploads and the bundled sample
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    if isinstance(data, dict):
+        data = [data]
+    return data
 
 
 def score_from_features_df(row: dict, bm25_score: float) -> dict:
@@ -224,71 +282,59 @@ def main():
     print("Redrob Intelligent Candidate Ranker")
     print("=" * 60)
 
-    # ── Step 1: Load precomputed artifacts ──────────────────────
-    bm25_model, candidate_ids, features_df = load_precomputed(args.data)
+    # ── Step 1: Load the trained model + (optionally) precomputed artifacts ──
+    # The model + feature list are committed to the repo and loaded INDEPENDENTLY of
+    # any precomputed feature matrix, so the LTR path is the guaranteed default in both
+    # the full-pool run and the standalone sandbox run.
+    standalone = args.standalone or args.sample
+    model, model_feature_names = load_ltr_model(args.data)
 
-    # Load the LTR model *independently* of the BM25 index so the LTR path is the
-    # guaranteed default whenever the model + feature matrix are present. (Previously
-    # the model was only loaded when bm25_index.pkl existed, so a repo that shipped
-    # the model but not the pickle silently degraded to the heuristic scorer.)
-    model = None
-    model_feature_names = None
-    model_path = os.path.join(args.data, "ltr_model.txt")
-    feature_names_path = os.path.join(args.data, "feature_names.json")
-    if features_df is not None and os.path.exists(model_path) and os.path.exists(feature_names_path):
-        import lightgbm as lgb
-        print(f"[rank] Loading LTR model from {model_path}...")
-        model = lgb.Booster(model_file=model_path)
-        with open(feature_names_path, "r") as f:
-            model_feature_names = json.load(f)
-
-    # The LTR / fast path is usable iff we have the feature matrix.
-    has_precomputed = features_df is not None
+    features_df = None
+    bm25_model = None
+    candidate_ids = None
     candidate_map = None
 
-    if has_precomputed and (bm25_model is None or candidate_ids is None):
-        # Feature matrix is present but the BM25 index is missing — rebuild it from
-        # the candidates file (and cache it) instead of dropping to the slow path.
-        print("[rank] BM25 index not found — building it from candidates (one-time)...")
-        if args.sample:
-            candidates = load_sample_candidates("sample_candidates.json")
-        else:
-            candidates = list(tqdm(
-                stream_candidates(args.candidates),
-                desc="Loading candidates", unit="cand"
-            ))
-        from ranker.bm25_retrieval import build_bm25_index, save_bm25_artifacts
-        bm25_model, candidate_ids = build_bm25_index(candidates, verbose=True)
-        try:
-            save_bm25_artifacts(bm25_model, candidate_ids, args.data)
-        except OSError as e:
-            print(f"[rank] WARNING: could not cache BM25 index: {e}")
+    if standalone:
+        print("[rank] STANDALONE inference mode - using the trained LTR model on features "
+              "computed on the fly. No precompute.py / train_ltr.py is run here.")
+    else:
+        bm25_model, candidate_ids, features_df = load_precomputed(args.data)
 
-    if not has_precomputed:
-        print("[rank] No feature matrix found. Running in slow heuristic mode...")
-        print("[rank] TIP: Run `python precompute.py` first for the full LTR pipeline.")
-
-        # Load candidates fresh
-        if args.sample:
-            candidates = load_sample_candidates("sample_candidates.json")
-        else:
-            candidates = list(tqdm(
-                stream_candidates(args.candidates),
-                desc="Loading candidates", unit="cand"
-            ))
+    # Load the raw candidates when we need them: always in standalone mode (to compute
+    # features), or in full mode only to (re)build a missing feature matrix / BM25 index.
+    candidates = None
+    if standalone or features_df is None or bm25_model is None:
+        candidates = load_candidates_any(args.candidates, args.sample)
         print(f"[rank] Loaded {len(candidates)} candidates.")
 
-        print("[rank] Building BM25 index...")
-        from ranker.bm25_retrieval import build_bm25_index
+    # Build the BM25 index when it was not loaded from disk.
+    if bm25_model is None or candidate_ids is None:
+        from ranker.bm25_retrieval import build_bm25_index, save_bm25_artifacts
+        print("[rank] Building BM25 index from candidates...")
         bm25_model, candidate_ids = build_bm25_index(candidates, verbose=True)
-        candidate_map = {c["candidate_id"]: c for c in candidates}
-    else:
-        num_feats = len(features_df) if features_df is not None else 0
-        print(f"[rank] Precomputed features: {num_feats} candidates")
-        if model is None:
-            print("[rank] WARNING: ltr_model.txt not found — using the heuristic feature "
-                  "scorer, NOT the LTR model. Provide ltr_model.txt to reproduce the "
-                  "submitted ranking.")
+        # Cache only for the full pool — never persist a tiny-sample index into --data.
+        if not standalone:
+            try:
+                save_bm25_artifacts(bm25_model, candidate_ids, args.data)
+            except OSError as e:
+                print(f"[rank] WARNING: could not cache BM25 index: {e}")
+
+    # Build the feature matrix on the fly when it was not precomputed.
+    if features_df is None:
+        if model is not None:
+            print(f"[rank] Computing features on the fly for {len(candidates)} candidates "
+                  "(standalone inference - TRAINED model, no precompute/training)...")
+            from ranker.feature_frame import build_feature_frame
+            features_df = build_feature_frame(candidates, show_progress=True)
+        else:
+            print("[rank] No LTR model found (ltr_model.txt missing) — falling back to the "
+                  "heuristic scorer. Provide ltr_model.txt to reproduce the submitted ranking.")
+            candidate_map = {c["candidate_id"]: c for c in candidates}
+
+    has_precomputed = features_df is not None
+    if has_precomputed:
+        print(f"[rank] Feature matrix ready: {len(features_df)} candidates"
+              f"{' (precomputed)' if not standalone else ' (computed on the fly)'}")
 
     # Assert non-None types to narrow type checker scope
     assert bm25_model is not None
@@ -321,8 +367,9 @@ def main():
             X_df = features_df.loc[cids].copy()
             X_df["bm25_score"] = bm25_scores
             
-            # Extract features aligned with model feature list
-            X = X_df[model_feature_names].astype(float)
+            # Align to the model's feature list. reindex (not direct indexing) so any
+            # column absent in an on-the-fly sample is filled with 0.0 rather than raising.
+            X = X_df.reindex(columns=model_feature_names, fill_value=0.0).astype(float)
             
             # Predict base scores
             preds = np.asarray(model.predict(X))

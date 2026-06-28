@@ -31,8 +31,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from ranker.loader import stream_candidates, load_sample_candidates
 from ranker.bm25_retrieval import build_bm25_index, save_bm25_artifacts
-from ranker.features import compute_all_features
-from ranker.honeypot import get_trap_multipliers
+from ranker.feature_frame import build_feature_frame
 
 
 def parse_args():
@@ -81,63 +80,15 @@ def main():
     print(f"[precompute] BM25 index built in {time.time()-t_bm25:.1f}s")
 
     # ── Step 3: Compute features ─────────────────────────────────
+    # Uses the SAME builder as rank.py's standalone path (ranker/feature_frame.py),
+    # so precomputed and on-the-fly features are constructed identically.
     print("\n[precompute] Computing features for all candidates...")
     t_feats = time.time()
-
-    all_feature_rows = []
-    failed = 0
-
-    for cand in tqdm(candidates, desc="Computing features", unit="cand"):
-        cid = cand.get("candidate_id", "")
-        try:
-            feats = compute_all_features(cand)
-            hp_mult, st_mult, trap_reason = get_trap_multipliers(cand)
-            feats["candidate_id"] = cid
-            feats["honeypot_multiplier"] = hp_mult
-            feats["stuffer_multiplier"] = st_mult
-            feats["trap_reason"] = trap_reason
-
-            # Store raw fields needed for reasoning generation
-            profile = cand.get("profile", {})
-            feats["_yoe"] = profile.get("years_of_experience", 0)
-            feats["_current_title"] = profile.get("current_title", "")
-            feats["_current_company"] = profile.get("current_company", "")
-            feats["_location"] = profile.get("location", "")
-            feats["_rrr"] = cand.get("redrob_signals", {}).get("recruiter_response_rate", 0)
-            feats["_notice"] = cand.get("redrob_signals", {}).get("notice_period_days", 60)
-            feats["_otw"] = int(cand.get("redrob_signals", {}).get("open_to_work_flag", False))
-
-            # Cache top skills for reasoning generation
-            skills = cand.get("skills", [])
-            top_skills = [
-                s.get("name", "") for s in skills
-                if s.get("proficiency") in ("expert", "advanced") and s.get("endorsements", 0) > 5
-            ][:4]
-            feats["_top_skills"] = ", ".join(top_skills) if top_skills else ""
-
-            # Cache top product company for reasoning
-            career = cand.get("career_history", [])
-            from ranker.features import _classify_company
-            product_cos = [
-                r.get("company", "") for r in career
-                if _classify_company(r.get("company", "")) in ("tier1", "tier2", "tier3")
-                and r.get("company", "") not in ("", "Unknown")
-            ]
-            feats["_top_company"] = product_cos[0] if product_cos else profile.get("current_company", "")
-
-            all_feature_rows.append(feats)
-        except Exception as e:
-            failed += 1
-            if failed <= 10:
-                print(f"[precompute] WARNING: failed on {cid}: {e}")
-            all_feature_rows.append({"candidate_id": cid, "error": str(e)})
-
-    print(f"[precompute] Features computed in {time.time()-t_feats:.1f}s ({failed} failures)")
+    df = build_feature_frame(candidates, show_progress=True)
+    print(f"[precompute] Features computed in {time.time()-t_feats:.1f}s")
 
     # ── Step 4: Save feature matrix ──────────────────────────────
     print("\n[precompute] Saving feature matrix...")
-    df = pd.DataFrame(all_feature_rows)
-    df = df.set_index("candidate_id")
 
     # Save as parquet for fast loading
     parquet_path = os.path.join(args.output, "features.parquet")

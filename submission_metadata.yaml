@@ -14,9 +14,11 @@ team_members:
     role: "ML Engineer"
 
 github_repo: "https://github.com/SwayamMohta/INDIA_RUNS_Hackathon"
-sandbox_link: "https://colab.research.google.com/FILL_ME"  # REQUIRED (§10.5). See README "Sandbox / Docker" section for the docker-run fallback.
+sandbox_link: "FILL_ME_HF_SPACE_URL"  # REQUIRED (§10.5). HuggingFace Space (Gradio); deploy via `python sandbox/build_space.py` — see SUBMISSION_GUIDE.md. Docker fallback documented in README.
 
-reproduce_command: "python precompute.py --candidates input/candidates.jsonl --output input && python rank.py --candidates input/candidates.jsonl --data input --output output/submission.csv"
+# Single command — features.parquet + ltr_model.txt are committed, so the ranking step
+# alone reproduces the full submission (BM25 index auto-rebuilt from --candidates, ~42s).
+reproduce_command: "python rank.py --candidates input/candidates.jsonl --data input --output output/submission.csv"
 
 compute:
   platform: "Dell G15 5530 (Intel Core i7 13th Gen)"
@@ -35,7 +37,7 @@ ai_tools_used:
   - "GitHub Copilot"
 
 ai_usage_summary: |
-  Used Gemini for code refactoring, pipeline debugging, and generating evaluation report structures. No candidate data was shared with external LLMs.
+  Used Gemini and Claude for code refactoring, pipeline debugging, and generating evaluation report structures. No candidate data was shared with external LLMs.
 
 methodology_summary: |
   BM25 retrieval over career descriptions feeds a LightGBM LambdaMART Learning-to-Rank
