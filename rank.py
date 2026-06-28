@@ -43,6 +43,9 @@ from ranker.scorer import (
     compute_behavioral_score,
     compute_availability_score,
     compute_education_score,
+    compute_consulting_multiplier,
+    compute_cv_mismatch_multiplier,
+    compute_title_chaser_multiplier,
 )
 from ranker.reasoning import generate_reasoning, truncate_reasoning
 from ranker.config import CONSULTING_ONLY_MULTIPLIER, DISQUALIFYING_TITLE_MULTIPLIER, DISQUALIFYING_TITLES, SUSPICIOUS_HONEYPOT_THRESHOLD
@@ -74,18 +77,25 @@ def parse_args():
 
 
 def load_precomputed(data_dir: str):
-    """Load precomputed BM25 index and feature matrix."""
+    """Load the precomputed feature matrix and (if present) the BM25 index.
+
+    The feature matrix is the artifact the LTR path needs. The BM25 index is
+    loaded if present but is NOT required here — main() rebuilds it from the
+    candidates file when missing, so the LTR path is never silently skipped just
+    because bm25_index.pkl was not shipped.
+    """
     bm25_path = os.path.join(data_dir, "bm25_index.pkl")
     feats_path = os.path.join(data_dir, "features.parquet")
 
-    if not os.path.exists(bm25_path) or not os.path.exists(feats_path):
-        return None, None, None
+    features_df = None
+    if os.path.exists(feats_path):
+        print(f"[rank] Loading feature matrix from {feats_path}...")
+        features_df = pd.read_parquet(feats_path)
 
-    print(f"[rank] Loading BM25 index from {bm25_path}...")
-    bm25_model, candidate_ids = load_bm25_artifacts(data_dir)
-
-    print(f"[rank] Loading feature matrix from {feats_path}...")
-    features_df = pd.read_parquet(feats_path)
+    bm25_model, candidate_ids = None, None
+    if os.path.exists(bm25_path):
+        print(f"[rank] Loading BM25 index from {bm25_path}...")
+        bm25_model, candidate_ids = load_bm25_artifacts(data_dir)
 
     return bm25_model, candidate_ids, features_df
 
@@ -130,10 +140,15 @@ def score_from_features_df(row: dict, bm25_score: float) -> dict:
         + WEIGHTS["education"] * education_score
     )
 
-    consulting_mult = (
-        CONSULTING_ONLY_MULTIPLIER
-        if risk_feats.get("is_consulting_only", 0) > 0.5
-        else 1.0
+    consulting_mult = compute_consulting_multiplier(
+        risk_feats.get("service_ratio", 0.0),
+        risk_feats.get("is_consulting_only", 0.0),
+    )
+    cv_mismatch_mult = compute_cv_mismatch_multiplier(
+        risk_feats.get("domain_mismatch_score", 0.0)
+    )
+    title_chaser_mult = compute_title_chaser_multiplier(
+        risk_feats.get("is_title_chaser", 0.0)
     )
 
     current_title = str(row.get("_current_title", "")).lower()
@@ -144,7 +159,10 @@ def score_from_features_df(row: dict, bm25_score: float) -> dict:
     )
 
     behavioral_gate = float(latent_feats.get("behavioral_gate", 0.5))
-    final_score = base_score * behavioral_gate * hp_mult * st_mult * consulting_mult * title_mult
+    final_score = (
+        base_score * behavioral_gate * hp_mult * st_mult
+        * consulting_mult * cv_mismatch_mult * title_chaser_mult * title_mult
+    )
     final_score = max(0.0, min(1.0, final_score))
 
     return {
@@ -208,24 +226,47 @@ def main():
 
     # ── Step 1: Load precomputed artifacts ──────────────────────
     bm25_model, candidate_ids, features_df = load_precomputed(args.data)
-    has_precomputed = bm25_model is not None
 
+    # Load the LTR model *independently* of the BM25 index so the LTR path is the
+    # guaranteed default whenever the model + feature matrix are present. (Previously
+    # the model was only loaded when bm25_index.pkl existed, so a repo that shipped
+    # the model but not the pickle silently degraded to the heuristic scorer.)
     model = None
     model_feature_names = None
-    if has_precomputed:
-        model_path = os.path.join(args.data, "ltr_model.txt")
-        feature_names_path = os.path.join(args.data, "feature_names.json")
-        if os.path.exists(model_path) and os.path.exists(feature_names_path):
-            import lightgbm as lgb
-            print(f"[rank] Loading LTR model from {model_path}...")
-            model = lgb.Booster(model_file=model_path)
-            with open(feature_names_path, "r") as f:
-                model_feature_names = json.load(f)
+    model_path = os.path.join(args.data, "ltr_model.txt")
+    feature_names_path = os.path.join(args.data, "feature_names.json")
+    if features_df is not None and os.path.exists(model_path) and os.path.exists(feature_names_path):
+        import lightgbm as lgb
+        print(f"[rank] Loading LTR model from {model_path}...")
+        model = lgb.Booster(model_file=model_path)
+        with open(feature_names_path, "r") as f:
+            model_feature_names = json.load(f)
 
-    if not has_precomputed or candidate_ids is None or features_df is None or bm25_model is None:
-        has_precomputed = False
-        print("[rank] No precomputed artifacts found. Running in slow mode...")
-        print("[rank] TIP: Run `python precompute.py` first for much faster ranking.")
+    # The LTR / fast path is usable iff we have the feature matrix.
+    has_precomputed = features_df is not None
+    candidate_map = None
+
+    if has_precomputed and (bm25_model is None or candidate_ids is None):
+        # Feature matrix is present but the BM25 index is missing — rebuild it from
+        # the candidates file (and cache it) instead of dropping to the slow path.
+        print("[rank] BM25 index not found — building it from candidates (one-time)...")
+        if args.sample:
+            candidates = load_sample_candidates("sample_candidates.json")
+        else:
+            candidates = list(tqdm(
+                stream_candidates(args.candidates),
+                desc="Loading candidates", unit="cand"
+            ))
+        from ranker.bm25_retrieval import build_bm25_index, save_bm25_artifacts
+        bm25_model, candidate_ids = build_bm25_index(candidates, verbose=True)
+        try:
+            save_bm25_artifacts(bm25_model, candidate_ids, args.data)
+        except OSError as e:
+            print(f"[rank] WARNING: could not cache BM25 index: {e}")
+
+    if not has_precomputed:
+        print("[rank] No feature matrix found. Running in slow heuristic mode...")
+        print("[rank] TIP: Run `python precompute.py` first for the full LTR pipeline.")
 
         # Load candidates fresh
         if args.sample:
@@ -244,12 +285,15 @@ def main():
     else:
         num_feats = len(features_df) if features_df is not None else 0
         print(f"[rank] Precomputed features: {num_feats} candidates")
-        candidate_map = None  # will use features_df
+        if model is None:
+            print("[rank] WARNING: ltr_model.txt not found — using the heuristic feature "
+                  "scorer, NOT the LTR model. Provide ltr_model.txt to reproduce the "
+                  "submitted ranking.")
 
     # Assert non-None types to narrow type checker scope
     assert bm25_model is not None
     assert candidate_ids is not None
-    assert features_df is not None
+    assert features_df is not None or candidate_map is not None
 
     # ── Step 2: BM25 Retrieval (Score all candidates) ────────────────
     top_k = len(candidate_ids)
@@ -299,10 +343,22 @@ def main():
                 st_mult = float(row.get("stuffer_multiplier", 1.0))
                 trap_reason = str(row.get("trap_reason", "clean"))
                 
-                # Consulting multiplier
-                is_consulting = float(row.get("risk_is_consulting_only", 0.0)) > 0.5
-                consulting_mult = CONSULTING_ONLY_MULTIPLIER if is_consulting else 1.0
-                
+                # Graded consulting multiplier (scales with service-firm tenure share)
+                consulting_mult = compute_consulting_multiplier(
+                    float(row.get("risk_service_ratio", 0.0)),
+                    float(row.get("risk_is_consulting_only", 0.0)),
+                )
+
+                # Graded domain-mismatch multiplier (CV/speech/robotics-primary, thin NLP/IR)
+                cv_mismatch_mult = compute_cv_mismatch_multiplier(
+                    float(row.get("risk_domain_mismatch_score", 0.0))
+                )
+
+                # Title-chaser multiplier
+                title_chaser_mult = compute_title_chaser_multiplier(
+                    float(row.get("risk_is_title_chaser", 0.0))
+                )
+
                 # Title multiplier
                 current_title = str(row.get("_current_title", "")).lower()
                 title_mult = (
@@ -310,14 +366,17 @@ def main():
                     if any(dt in current_title for dt in DISQUALIFYING_TITLES)
                     else 1.0
                 )
-                
+
                 # Hard-drop suspicious honeypots
                 is_honeypot = hp_mult == 0.0 or hp_mult < SUSPICIOUS_HONEYPOT_THRESHOLD
                 if is_honeypot:
                     final_score = 0.0
                 else:
                     behavioral_gate = float(row.get("latent_behavioral_gate", 0.5))
-                    final_score = norm_preds[i] * behavioral_gate * hp_mult * st_mult * consulting_mult * title_mult
+                    final_score = (
+                        norm_preds[i] * behavioral_gate * hp_mult * st_mult
+                        * consulting_mult * cv_mismatch_mult * title_chaser_mult * title_mult
+                    )
                     final_score = max(0.0, min(1.0, final_score))
                 
                 # Extract original features for reasoning

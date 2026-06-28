@@ -5,9 +5,13 @@ __pycache__/
 .ipynb_checkpoints
 .pytest_cache/
 
-# Exclude large data files
+# Raw candidate pool — large, supplied by organizers at reproduction time.
 input/candidates.jsonl
+
+# BM25 index — ~120 MB, exceeds GitHub's 100 MB file limit. It is regenerable:
+# precompute.py rebuilds it, and rank.py auto-builds it from --candidates if absent.
+# The LTR artifacts that ARE committed (features.parquet, ltr_model.txt,
+# feature_names.json) are enough for rank.py to reproduce the submitted ranking.
 input/bm25_index.pkl
 
-# Exclude final outputs
-output/submission.csv
+# NOTE: output/submission.csv IS committed (the final ranking) — do not ignore it.

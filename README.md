@@ -17,27 +17,56 @@ This directory contains the production-grade candidate discovery and ranking sys
 
 ## Installation & Setup
 
-Ensure all dependencies are installed:
+Ensure all dependencies are installed (LightGBM is required — it powers the LTR ranker):
 ```bash
 pip install -r requirements.txt
 ```
 
+Place the organizer-provided candidate pool at `input/candidates.jsonl` (this file is
+git-ignored because of its size; it is supplied at reproduction time).
+
 ---
 
-## How to Run (Reproduction Command)
+## How to Run (Reproduction)
 
-To run the ranking pipeline on the full dataset and generate the final output, run the following command from the `FINAL/` directory:
+The system has a one-time **precompute** step (no time limit) and a fast **ranking** step
+(the < 5-minute, CPU-only, no-network step that produces the submission CSV).
 
+### Step 1 — Precompute (one-time, ~10-15 min for 100k candidates)
+Builds the BM25 index (`input/bm25_index.pkl`) and the feature matrix
+(`input/features.parquet`). A pre-built `features.parquet` and trained `ltr_model.txt`
+ship in the repo; this step regenerates `bm25_index.pkl` (and refreshes features):
+```bash
+python precompute.py --candidates input/candidates.jsonl --output input
+```
+(Optional — retrain the LTR model after a feature change: `python scripts/train_ltr.py`)
+
+### Step 2 — Rank (the < 5-minute step)
 ```bash
 python rank.py --candidates input/candidates.jsonl --data input --output output/submission.csv
 ```
+This loads the precomputed artifacts + the LightGBM LTR model and finishes in **under
+30 seconds** on a single CPU core. If `bm25_index.pkl` is absent it is rebuilt on the
+fly from `--candidates` (slower, but the LTR model is still used). The ranking step makes
+no network calls and uses no GPU.
 
 ### Script Arguments:
-- `--candidates`: Path to the input JSONL file containing candidate profiles (default: `candidates.jsonl`).
-- `--data`: Path to the directory containing precomputed indices, feature parquet, and models (default: `data`).
-- `--output` / `--out`: Path to write the final CSV output (default: `submission.csv`).
+- `--candidates`: Path to the input JSONL file containing candidate profiles.
+- `--data`: Directory containing precomputed indices, feature parquet, and the LTR model (default: `input`).
+- `--output` / `--out`: Path to write the final CSV output.
 
-The pipeline will finish in **under 20 seconds** on a single CPU core, filtering out honeypots and producing a fully compliant top-100 list with fact-grounded reasoning.
+---
+
+## Sandbox / Docker (for §10.5 reproduction)
+
+If the hosted sandbox link is unavailable, the system reproduces unmodified via Docker:
+```bash
+docker run --rm -v "$PWD:/work" -w /work python:3.10-slim bash -c \
+  "pip install -r requirements.txt && \
+   python precompute.py --candidates input/candidates.jsonl --output input && \
+   python rank.py --candidates input/candidates.jsonl --data input --output output/submission.csv"
+```
+For the small-sample sanity check, pass `--sample` to operate on `sample_candidates.json`.
 
 ---
 
