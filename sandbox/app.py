@@ -56,8 +56,12 @@ def rank_sample(uploaded_file):
     (preview_dataframe, downloadable_csv_path, run_log)."""
     log_lines = []
 
-    # 1) Resolve input: uploaded file, else the bundled sample.
-    src = uploaded_file.name if uploaded_file is not None else SAMPLE
+    # 1) Resolve input: uploaded file, else the bundled sample. gr.File passes a string
+    #    path (type="filepath"); older gradio passes an object with .name — handle both.
+    if uploaded_file is None:
+        src = SAMPLE
+    else:
+        src = uploaded_file if isinstance(uploaded_file, str) else uploaded_file.name
     if not os.path.exists(src):
         return None, None, f"ERROR: input not found: {src}"
 

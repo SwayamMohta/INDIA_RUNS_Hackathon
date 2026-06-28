@@ -77,7 +77,7 @@ within the 5-minute budget, and reproduces the committed `output/submission.csv`
 
 ## Sandbox (submission_spec.md §10.5)
 
-**Hosted demo:** `<SANDBOX_LINK>` — a HuggingFace Space (Gradio). Upload a ≤100-candidate
+**Hosted demo:** https://huggingface.co/spaces/suhas9545/redrob-ranker — a HuggingFace Space (Gradio). Upload a ≤100-candidate
 sample (JSON array or JSONL) or use the bundled 50-candidate sample; it ranks them
 end-to-end and returns a CSV. It is **inference-only**: it loads the trained model and never
 trains/precomputes. Assemble & deploy it with `python sandbox/build_space.py` (see

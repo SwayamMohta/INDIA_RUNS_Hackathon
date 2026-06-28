@@ -14,7 +14,7 @@ team_members:
     role: "ML Engineer"
 
 github_repo: "https://github.com/SwayamMohta/INDIA_RUNS_Hackathon"
-sandbox_link: "FILL_ME_HF_SPACE_URL"  # REQUIRED (§10.5). HuggingFace Space (Gradio); deploy via `python sandbox/build_space.py` — see SUBMISSION_GUIDE.md. Docker fallback documented in README.
+sandbox_link: "https://huggingface.co/spaces/suhas9545/redrob-ranker"  # §10.5 HuggingFace Space (Gradio), inference-only. Verified running. Docker fallback also in README.
 
 # Single command — features.parquet + ltr_model.txt are committed, so the ranking step
 # alone reproduces the full submission (BM25 index auto-rebuilt from --candidates, ~42s).
