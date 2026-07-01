@@ -1,16 +1,16 @@
 team_name: "SwayamMohta"
 
 primary_contact:
-  name: "Swayam Mohta"
-  email: "mohtaswayam@gmail.com"
-  phone: "+91-XXXXXXXXXX"        # REQUIRED — fill in before submitting (used for top-N outreach)
+  name: "Polavarapu Sri Suhas"
+  email: "srisuhas12345@gmail.com"
+  phone: "+91-8340062039"        # REQUIRED — fill in before submitting (used for top-N outreach)
 
 team_members:
   - name: "Swayam Mohta"
     email: "mohtaswayam@gmail.com"
     role: "ML Engineer"
-  - name: "Sri Suhas P"
-    email: "FILL_ME@example.com"  # REQUIRED — add the real email before submitting
+  - name: "Polavarapu Sri Suhas"
+    email: "srisuhas12345@gmail.com"  # REQUIRED — add the real email before submitting
     role: "ML Engineer"
 
 github_repo: "https://github.com/SwayamMohta/INDIA_RUNS_Hackathon"
