@@ -23,6 +23,8 @@ from ranker.config import (
     WEIGHTS,
     HONEYPOT_MULTIPLIER, KEYWORD_STUFFER_MULTIPLIER,
     CONSULTING_ONLY_MULTIPLIER, DISQUALIFYING_TITLE_MULTIPLIER,
+    CV_MISMATCH_FLOOR, CV_MISMATCH_CEIL, CV_MISMATCH_TRIGGER,
+    TITLE_CHASER_MULTIPLIER,
 )
 from ranker.honeypot import get_trap_multipliers
 from ranker.features import (
@@ -30,6 +32,48 @@ from ranker.features import (
     compute_behavioral_features, compute_risk_features,
     compute_latent_features,
 )
+
+
+# ─────────────────────────────────────────────────────────────────
+# GRADED PENALTY MULTIPLIERS
+# Shared by both the LTR path (rank.py) and the heuristic path so they
+# stay consistent. Each returns a value in (0, 1].
+# ─────────────────────────────────────────────────────────────────
+
+def compute_cv_mismatch_multiplier(domain_mismatch_score: float) -> float:
+    """Graded penalty for CV/speech/robotics-primary profiles with thin NLP/IR.
+
+    Returns 1.0 below the trigger, interpolating down to CV_MISMATCH_FLOOR at a
+    fully off-domain profile (score = 1.0). Encodes the JD's explicit reject of
+    'primary expertise is computer vision, speech, or robotics without significant
+    NLP/IR exposure'.
+    """
+    s = float(domain_mismatch_score)
+    if s <= CV_MISMATCH_TRIGGER:
+        return CV_MISMATCH_CEIL
+    frac = (s - CV_MISMATCH_TRIGGER) / (1.0 - CV_MISMATCH_TRIGGER)
+    return CV_MISMATCH_CEIL - frac * (CV_MISMATCH_CEIL - CV_MISMATCH_FLOOR)
+
+
+def compute_consulting_multiplier(service_ratio: float, is_consulting_only: float = 0.0) -> float:
+    """Graded consulting penalty scaled by service-firm tenure share.
+
+    Full product-company career (service_ratio=0) → 1.0; all-service → the
+    CONSULTING_ONLY_MULTIPLIER floor. Only penalizes when service work dominates
+    (>50% of tenure), so a single short stint at a service firm is not punished.
+    """
+    sr = float(service_ratio)
+    if is_consulting_only > 0.5:
+        return CONSULTING_ONLY_MULTIPLIER
+    if sr <= 0.5:
+        return 1.0
+    frac = (sr - 0.5) / 0.5
+    return 1.0 - frac * (1.0 - CONSULTING_ONLY_MULTIPLIER)
+
+
+def compute_title_chaser_multiplier(is_title_chaser: float) -> float:
+    """Mild penalty for serial short-tenure title-hopping."""
+    return TITLE_CHASER_MULTIPLIER if float(is_title_chaser) > 0.5 else 1.0
 
 
 def compute_career_trajectory_score(career_feats: Dict, latent_feats: Dict) -> float:
@@ -162,11 +206,20 @@ def score_candidate(
         + WEIGHTS["education"] * education_score
     )
 
-    # ── Consulting-Only Multiplier ───────────────────────────────
-    consulting_mult = (
-        CONSULTING_ONLY_MULTIPLIER
-        if risk_feats.get("is_consulting_only", 0) > 0.5
-        else 1.0
+    # ── Graded Consulting Multiplier ─────────────────────────────
+    consulting_mult = compute_consulting_multiplier(
+        risk_feats.get("service_ratio", 0.0),
+        risk_feats.get("is_consulting_only", 0.0),
+    )
+
+    # ── Domain-Mismatch (CV/speech/robotics) Multiplier ──────────
+    cv_mismatch_mult = compute_cv_mismatch_multiplier(
+        risk_feats.get("domain_mismatch_score", 0.0)
+    )
+
+    # ── Title-Chaser Multiplier ──────────────────────────────────
+    title_chaser_mult = compute_title_chaser_multiplier(
+        risk_feats.get("is_title_chaser", 0.0)
     )
 
     # ── Disqualifying Title Multiplier ───────────────────────────
@@ -181,7 +234,10 @@ def score_candidate(
 
     # ── Final Score ──────────────────────────────────────────────
     behavioral_gate = latent_feats.get("behavioral_gate", 0.5)
-    final_score = base_score * behavioral_gate * hp_mult * st_mult * consulting_mult * title_mult
+    final_score = (
+        base_score * behavioral_gate * hp_mult * st_mult
+        * consulting_mult * cv_mismatch_mult * title_chaser_mult * title_mult
+    )
     final_score = max(0.0, min(1.0, final_score))
 
     return {
@@ -198,6 +254,8 @@ def score_candidate(
             "honeypot": hp_mult,
             "stuffer": st_mult,
             "consulting": consulting_mult,
+            "cv_mismatch": cv_mismatch_mult,
+            "title_chaser": title_chaser_mult,
             "title": title_mult,
         },
         "trap_reasons": trap_reason,

@@ -20,13 +20,13 @@ from ranker.config import EVAL_DATE, ALIGNED_TITLES, DISQUALIFYING_TITLES
 # 28 distinct templates: 4 rank tiers × 7 dominant strengths
 TEMPLATES = {
     "ELITE": {
-        "DOMAIN_SHIPPER": "Elite fit: {yoe:.0f}yr ML veteran who shipped ranking/search engines at {top_company}, bringing expert {skills_str} capabilities. Highly active ({rrr:.0%} response) and ready to build.",
-        "TECH_DEPTH": "Highly technical candidate: {yoe:.0f}yr engineer with outstanding {skills_str} depth, backed by a strong {github:.0f} GitHub activity score and excellent technical assessment performance.",
-        "BEHAVIORAL_STRONG": "Top-tier talent: {yoe:.0f}yr {current_title} with exceptional hireability metrics ({rrr:.0%} response rate, {notice}d notice), combining solid {skills_str} expertise with high team engagement.",
-        "PEDIGREE_STRONG": "Premium pedigree: {yoe:.0f}yr SDE with experience at top-tier product giants (e.g. {top_company}), bringing robust systems engineering practices and production-ready {skills_str} expertise.",
-        "LOCATION_CONCERN": "Outstanding profile: {yoe:.0f}yr veteran with strong {skills_str} depth from {top_company}; note: located in {location} but open to relocation with very high responsiveness.",
-        "EXPERIENCE_CONCERN": "Seasoned leader: {yoe:.0f}yr Senior/Staff expert with massive experience architecting systems at {top_company}; excellent fit for technical leadership on vector search and LLMs.",
-        "CONSULTING_ADJACENT": "Strong adaptive profile: {yoe:.0f}yr engineer with product-focused shipping experience at {top_company} alongside service firm adaptability, showing expert {skills_str} competency."
+        "DOMAIN_SHIPPER": "Strong fit: {yoe:.0f}yr {current_title} with production retrieval/recommendation experience at {top_company}, bringing {skills_str}. Highly active ({rrr:.0%} response) and open to work.",
+        "TECH_DEPTH": "Highly technical: {yoe:.0f}yr {current_title} with strong {skills_str} depth, backed by a {github:.0f} GitHub activity score and solid technical-assessment performance.",
+        "BEHAVIORAL_STRONG": "Top fit: {yoe:.0f}yr {current_title} with strong hireability ({rrr:.0%} response rate, {notice}d notice), combining solid {skills_str} with high platform engagement.",
+        "PEDIGREE_STRONG": "Strong product-company background: {yoe:.0f}yr {current_title} with tenure at firms like {top_company} and production-ready {skills_str} experience.",
+        "LOCATION_CONCERN": "Strong profile: {yoe:.0f}yr {current_title} with solid {skills_str} depth from {top_company}; based in {location} but open to relocation with high responsiveness.",
+        "EXPERIENCE_CONCERN": "Strong fit with an experience-band note: {yoe:.0f}yr {current_title} at {top_company} with relevant vector search / LLM exposure; YOE sits outside the ideal 4-12yr range.",
+        "CONSULTING_ADJACENT": "Adaptive profile: {yoe:.0f}yr {current_title} with product engineering experience at {top_company} alongside some service-firm work, showing {skills_str} competency."
     },
     "TOP": {
         "DOMAIN_SHIPPER": "Strong match: {yoe:.0f}yr {current_title} who deployed retrieval and recommendation systems at {top_company}, matching the JD's core vector search and ranking requirements.",
@@ -186,6 +186,14 @@ def generate_reasoning(
         tier = "MID"
     else:
         tier = "LOWER"
+
+    # Tone guard (Stage-4 rank/tone consistency): do not apply the most emphatic
+    # "elite/senior" wording to a clearly-junior current title. Use the next, more
+    # measured wording tier so the reasoning matches the candidate's actual profile.
+    if tier == "ELITE" and any(
+        j in current_title.lower() for j in ("junior", "associate", "trainee", "intern")
+    ):
+        tier = "TOP"
 
     strength = classify_dominant_strength(candidate, score_result)
     

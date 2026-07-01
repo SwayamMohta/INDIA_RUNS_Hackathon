@@ -43,6 +43,9 @@ from ranker.scorer import (
     compute_behavioral_score,
     compute_availability_score,
     compute_education_score,
+    compute_consulting_multiplier,
+    compute_cv_mismatch_multiplier,
+    compute_title_chaser_multiplier,
 )
 from ranker.reasoning import generate_reasoning, truncate_reasoning
 from ranker.config import CONSULTING_ONLY_MULTIPLIER, DISQUALIFYING_TITLE_MULTIPLIER, DISQUALIFYING_TITLES, SUSPICIOUS_HONEYPOT_THRESHOLD
@@ -56,11 +59,18 @@ def parse_args():
     )
     parser.add_argument(
         "--sample", action="store_true",
-        help="Use sample_candidates.json instead (for testing)"
+        help="Use the bundled sample_candidates.json (implies --standalone)"
+    )
+    parser.add_argument(
+        "--standalone", action="store_true",
+        help="Inference-only mode: compute features on the fly from --candidates using the "
+             "TRAINED LTR model, ignoring any precomputed feature matrix / BM25 pickle. This "
+             "is what the sandbox uses to rank a small (<=100) sample end-to-end without "
+             "re-running precompute.py or train_ltr.py."
     )
     parser.add_argument(
         "--data", default="data",
-        help="Directory containing precomputed artifacts (default: data/)"
+        help="Directory containing the trained model + precomputed artifacts (default: data/)"
     )
     parser.add_argument(
         "--output", "--out", default="submission.csv",
@@ -74,20 +84,78 @@ def parse_args():
 
 
 def load_precomputed(data_dir: str):
-    """Load precomputed BM25 index and feature matrix."""
+    """Load the precomputed feature matrix and (if present) the BM25 index.
+
+    The feature matrix is the artifact the LTR path needs. The BM25 index is
+    loaded if present but is NOT required here — main() rebuilds it from the
+    candidates file when missing, so the LTR path is never silently skipped just
+    because bm25_index.pkl was not shipped.
+    """
     bm25_path = os.path.join(data_dir, "bm25_index.pkl")
     feats_path = os.path.join(data_dir, "features.parquet")
 
-    if not os.path.exists(bm25_path) or not os.path.exists(feats_path):
-        return None, None, None
+    features_df = None
+    if os.path.exists(feats_path):
+        print(f"[rank] Loading feature matrix from {feats_path}...")
+        features_df = pd.read_parquet(feats_path)
 
-    print(f"[rank] Loading BM25 index from {bm25_path}...")
-    bm25_model, candidate_ids = load_bm25_artifacts(data_dir)
-
-    print(f"[rank] Loading feature matrix from {feats_path}...")
-    features_df = pd.read_parquet(feats_path)
+    bm25_model, candidate_ids = None, None
+    if os.path.exists(bm25_path):
+        print(f"[rank] Loading BM25 index from {bm25_path}...")
+        bm25_model, candidate_ids = load_bm25_artifacts(data_dir)
 
     return bm25_model, candidate_ids, features_df
+
+
+def load_ltr_model(data_dir: str):
+    """Load the trained LightGBM LTR model and its feature list, if present.
+
+    This is decoupled from any precomputed feature matrix: the model + feature
+    list are committed to the repo, so they are available for both the full-pool
+    run and the standalone sandbox run. Returns (model, feature_names) or (None, None).
+    """
+    model_path = os.path.join(data_dir, "ltr_model.txt")
+    feature_names_path = os.path.join(data_dir, "feature_names.json")
+    if not (os.path.exists(model_path) and os.path.exists(feature_names_path)):
+        return None, None
+    import lightgbm as lgb
+    print(f"[rank] Loading trained LTR model from {model_path}...")
+    model = lgb.Booster(model_file=model_path)
+    with open(feature_names_path, "r") as f:
+        feature_names = json.load(f)
+    return model, feature_names
+
+
+def _resolve_sample_path(path: str) -> str:
+    """Find the bundled sample candidates file from any reasonable CWD."""
+    if path and path != "candidates.jsonl" and os.path.exists(path):
+        return path
+    for cand in (
+        os.path.join("input", "sample_candidates.json"),
+        "sample_candidates.json",
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "input", "sample_candidates.json"),
+    ):
+        if os.path.exists(cand):
+            return cand
+    raise FileNotFoundError("Could not locate sample_candidates.json (looked in ./input and ./).")
+
+
+def load_candidates_any(path: str, sample: bool):
+    """Load candidates from a JSON array, a single JSON object, or JSONL.
+
+    The sandbox/sample inputs are small JSON arrays; the full pool is JSONL. We
+    pick the parser by extension to avoid slurping the 487 MB JSONL into json.load.
+    """
+    if sample:
+        path = _resolve_sample_path(path)
+    if path.endswith(".jsonl"):
+        return list(tqdm(stream_candidates(path), desc="Loading candidates", unit="cand"))
+    # .json (array or single object) — sandbox uploads and the bundled sample
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    if isinstance(data, dict):
+        data = [data]
+    return data
 
 
 def score_from_features_df(row: dict, bm25_score: float) -> dict:
@@ -130,10 +198,15 @@ def score_from_features_df(row: dict, bm25_score: float) -> dict:
         + WEIGHTS["education"] * education_score
     )
 
-    consulting_mult = (
-        CONSULTING_ONLY_MULTIPLIER
-        if risk_feats.get("is_consulting_only", 0) > 0.5
-        else 1.0
+    consulting_mult = compute_consulting_multiplier(
+        risk_feats.get("service_ratio", 0.0),
+        risk_feats.get("is_consulting_only", 0.0),
+    )
+    cv_mismatch_mult = compute_cv_mismatch_multiplier(
+        risk_feats.get("domain_mismatch_score", 0.0)
+    )
+    title_chaser_mult = compute_title_chaser_multiplier(
+        risk_feats.get("is_title_chaser", 0.0)
     )
 
     current_title = str(row.get("_current_title", "")).lower()
@@ -144,7 +217,10 @@ def score_from_features_df(row: dict, bm25_score: float) -> dict:
     )
 
     behavioral_gate = float(latent_feats.get("behavioral_gate", 0.5))
-    final_score = base_score * behavioral_gate * hp_mult * st_mult * consulting_mult * title_mult
+    final_score = (
+        base_score * behavioral_gate * hp_mult * st_mult
+        * consulting_mult * cv_mismatch_mult * title_chaser_mult * title_mult
+    )
     final_score = max(0.0, min(1.0, final_score))
 
     return {
@@ -206,50 +282,64 @@ def main():
     print("Redrob Intelligent Candidate Ranker")
     print("=" * 60)
 
-    # ── Step 1: Load precomputed artifacts ──────────────────────
-    bm25_model, candidate_ids, features_df = load_precomputed(args.data)
-    has_precomputed = bm25_model is not None
+    # ── Step 1: Load the trained model + (optionally) precomputed artifacts ──
+    # The model + feature list are committed to the repo and loaded INDEPENDENTLY of
+    # any precomputed feature matrix, so the LTR path is the guaranteed default in both
+    # the full-pool run and the standalone sandbox run.
+    standalone = args.standalone or args.sample
+    model, model_feature_names = load_ltr_model(args.data)
 
-    model = None
-    model_feature_names = None
-    if has_precomputed:
-        model_path = os.path.join(args.data, "ltr_model.txt")
-        feature_names_path = os.path.join(args.data, "feature_names.json")
-        if os.path.exists(model_path) and os.path.exists(feature_names_path):
-            import lightgbm as lgb
-            print(f"[rank] Loading LTR model from {model_path}...")
-            model = lgb.Booster(model_file=model_path)
-            with open(feature_names_path, "r") as f:
-                model_feature_names = json.load(f)
+    features_df = None
+    bm25_model = None
+    candidate_ids = None
+    candidate_map = None
 
-    if not has_precomputed or candidate_ids is None or features_df is None or bm25_model is None:
-        has_precomputed = False
-        print("[rank] No precomputed artifacts found. Running in slow mode...")
-        print("[rank] TIP: Run `python precompute.py` first for much faster ranking.")
+    if standalone:
+        print("[rank] STANDALONE inference mode - using the trained LTR model on features "
+              "computed on the fly. No precompute.py / train_ltr.py is run here.")
+    else:
+        bm25_model, candidate_ids, features_df = load_precomputed(args.data)
 
-        # Load candidates fresh
-        if args.sample:
-            candidates = load_sample_candidates("sample_candidates.json")
-        else:
-            candidates = list(tqdm(
-                stream_candidates(args.candidates),
-                desc="Loading candidates", unit="cand"
-            ))
+    # Load the raw candidates when we need them: always in standalone mode (to compute
+    # features), or in full mode only to (re)build a missing feature matrix / BM25 index.
+    candidates = None
+    if standalone or features_df is None or bm25_model is None:
+        candidates = load_candidates_any(args.candidates, args.sample)
         print(f"[rank] Loaded {len(candidates)} candidates.")
 
-        print("[rank] Building BM25 index...")
-        from ranker.bm25_retrieval import build_bm25_index
+    # Build the BM25 index when it was not loaded from disk.
+    if bm25_model is None or candidate_ids is None:
+        from ranker.bm25_retrieval import build_bm25_index, save_bm25_artifacts
+        print("[rank] Building BM25 index from candidates...")
         bm25_model, candidate_ids = build_bm25_index(candidates, verbose=True)
-        candidate_map = {c["candidate_id"]: c for c in candidates}
-    else:
-        num_feats = len(features_df) if features_df is not None else 0
-        print(f"[rank] Precomputed features: {num_feats} candidates")
-        candidate_map = None  # will use features_df
+        # Cache only for the full pool — never persist a tiny-sample index into --data.
+        if not standalone:
+            try:
+                save_bm25_artifacts(bm25_model, candidate_ids, args.data)
+            except OSError as e:
+                print(f"[rank] WARNING: could not cache BM25 index: {e}")
+
+    # Build the feature matrix on the fly when it was not precomputed.
+    if features_df is None:
+        if model is not None:
+            print(f"[rank] Computing features on the fly for {len(candidates)} candidates "
+                  "(standalone inference - TRAINED model, no precompute/training)...")
+            from ranker.feature_frame import build_feature_frame
+            features_df = build_feature_frame(candidates, show_progress=True)
+        else:
+            print("[rank] No LTR model found (ltr_model.txt missing) — falling back to the "
+                  "heuristic scorer. Provide ltr_model.txt to reproduce the submitted ranking.")
+            candidate_map = {c["candidate_id"]: c for c in candidates}
+
+    has_precomputed = features_df is not None
+    if has_precomputed:
+        print(f"[rank] Feature matrix ready: {len(features_df)} candidates"
+              f"{' (precomputed)' if not standalone else ' (computed on the fly)'}")
 
     # Assert non-None types to narrow type checker scope
     assert bm25_model is not None
     assert candidate_ids is not None
-    assert features_df is not None
+    assert features_df is not None or candidate_map is not None
 
     # ── Step 2: BM25 Retrieval (Score all candidates) ────────────────
     top_k = len(candidate_ids)
@@ -277,8 +367,9 @@ def main():
             X_df = features_df.loc[cids].copy()
             X_df["bm25_score"] = bm25_scores
             
-            # Extract features aligned with model feature list
-            X = X_df[model_feature_names].astype(float)
+            # Align to the model's feature list. reindex (not direct indexing) so any
+            # column absent in an on-the-fly sample is filled with 0.0 rather than raising.
+            X = X_df.reindex(columns=model_feature_names, fill_value=0.0).astype(float)
             
             # Predict base scores
             preds = np.asarray(model.predict(X))
@@ -299,10 +390,22 @@ def main():
                 st_mult = float(row.get("stuffer_multiplier", 1.0))
                 trap_reason = str(row.get("trap_reason", "clean"))
                 
-                # Consulting multiplier
-                is_consulting = float(row.get("risk_is_consulting_only", 0.0)) > 0.5
-                consulting_mult = CONSULTING_ONLY_MULTIPLIER if is_consulting else 1.0
-                
+                # Graded consulting multiplier (scales with service-firm tenure share)
+                consulting_mult = compute_consulting_multiplier(
+                    float(row.get("risk_service_ratio", 0.0)),
+                    float(row.get("risk_is_consulting_only", 0.0)),
+                )
+
+                # Graded domain-mismatch multiplier (CV/speech/robotics-primary, thin NLP/IR)
+                cv_mismatch_mult = compute_cv_mismatch_multiplier(
+                    float(row.get("risk_domain_mismatch_score", 0.0))
+                )
+
+                # Title-chaser multiplier
+                title_chaser_mult = compute_title_chaser_multiplier(
+                    float(row.get("risk_is_title_chaser", 0.0))
+                )
+
                 # Title multiplier
                 current_title = str(row.get("_current_title", "")).lower()
                 title_mult = (
@@ -310,14 +413,17 @@ def main():
                     if any(dt in current_title for dt in DISQUALIFYING_TITLES)
                     else 1.0
                 )
-                
+
                 # Hard-drop suspicious honeypots
                 is_honeypot = hp_mult == 0.0 or hp_mult < SUSPICIOUS_HONEYPOT_THRESHOLD
                 if is_honeypot:
                     final_score = 0.0
                 else:
                     behavioral_gate = float(row.get("latent_behavioral_gate", 0.5))
-                    final_score = norm_preds[i] * behavioral_gate * hp_mult * st_mult * consulting_mult * title_mult
+                    final_score = (
+                        norm_preds[i] * behavioral_gate * hp_mult * st_mult
+                        * consulting_mult * cv_mismatch_mult * title_chaser_mult * title_mult
+                    )
                     final_score = max(0.0, min(1.0, final_score))
                 
                 # Extract original features for reasoning

@@ -1,0 +1,9 @@
+.git
+.claude
+data
+__pycache__
+**/__pycache__
+*.pyc
+input/candidates.jsonl
+input/bm25_index.pkl
+sandbox/_space

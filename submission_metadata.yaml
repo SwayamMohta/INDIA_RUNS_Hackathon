@@ -3,19 +3,21 @@ team_name: "SwayamMohta"
 primary_contact:
   name: "Swayam Mohta"
   email: "mohtaswayam@gmail.com"
-  phone: ""
+  phone: "+91-XXXXXXXXXX"        # REQUIRED — fill in before submitting (used for top-N outreach)
 
 team_members:
   - name: "Swayam Mohta"
     email: "mohtaswayam@gmail.com"
     role: "ML Engineer"
   - name: "Sri Suhas P"
-    email: ""
+    email: "FILL_ME@example.com"  # REQUIRED — add the real email before submitting
     role: "ML Engineer"
 
-github_repo: "https://github.com/SwayamMohta/trail_Repo"
-sandbox_link: ""
+github_repo: "https://github.com/SwayamMohta/INDIA_RUNS_Hackathon"
+sandbox_link: "https://huggingface.co/spaces/suhas9545/redrob-ranker"  # §10.5 HuggingFace Space (Gradio), inference-only. Verified running. Docker fallback also in README.
 
+# Single command — features.parquet + ltr_model.txt are committed, so the ranking step
+# alone reproduces the full submission (BM25 index auto-rebuilt from --candidates, ~42s).
 reproduce_command: "python rank.py --candidates input/candidates.jsonl --data input --output output/submission.csv"
 
 compute:
@@ -26,8 +28,8 @@ compute:
   os: "Windows 11"
   uses_gpu_for_inference: false
   has_network_during_ranking: false
-  pre_computation_required: false
-  pre_computation_time_minutes: 0
+  pre_computation_required: true                 # precompute.py builds the BM25 index + feature matrix offline
+  pre_computation_time_minutes: 15               # ~10-15 min for 100k candidates (one-time, outside the 5-min ranking window)
 
 ai_tools_used:
   - "Gemini"
@@ -35,10 +37,18 @@ ai_tools_used:
   - "GitHub Copilot"
 
 ai_usage_summary: |
-  Used Gemini for code refactoring, pipeline debugging, and generating evaluation report structures. No candidate data was shared with external LLMs.
+  Used Gemini and Claude for code refactoring, pipeline debugging, and generating evaluation report structures. No candidate data was shared with external LLMs.
 
 methodology_summary: |
-  A machine learning pipeline utilizing a LightGBM LambdaMART Learning-to-Rank (LTR) model. Candidate profiles are first filtered through a honeypot suppression rule to eliminate trap profiles. Feature engineering constructs overlap/relevance signals (e.g. JD Jaccard overlap, title match score) combined with candidate attributes (e.g. notice period, responsiveness rate, certifications). Deterministic tie-breaking ensures unique candidate IDs in the final Top-100 list.
+  BM25 retrieval over career descriptions feeds a LightGBM LambdaMART Learning-to-Rank
+  model trained on ~80 engineered features (career trajectory, product-vs-service ratio,
+  domain-shipping evidence, JD skill/title overlap, behavioral availability). Honeypots
+  (impossible-profile checks against real company founding years) are hard-dropped.
+  Graded multiplicative penalties model the JD's explicit anti-signals: a domain-mismatch
+  penalty down-weights computer-vision/speech/robotics-primary profiles with thin NLP/IR
+  evidence, and a graded consulting penalty scales with product-vs-service career ratio.
+  Reasoning is template-based and grounded only in verifiable profile fields (no LLM calls
+  during ranking). Deterministic score+candidate_id tie-break yields the final Top-100.
 
 declarations:
   read_submission_spec: true

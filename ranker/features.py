@@ -19,11 +19,14 @@ from typing import Dict, Any, List, Optional
 from ranker.config import (
     EVAL_DATE, CORE_SKILLS, SHIPPER_VERBS,
     RETRIEVAL_KEYWORDS, RANKING_KEYWORDS, LLM_KEYWORDS, PRODUCTION_KEYWORDS,
+    CV_KEYWORDS, SPEECH_KEYWORDS, ROBOTICS_KEYWORDS, NLP_IR_KEYWORDS,
+    CV_TITLE_TERMS, CV_TITLE_FORCED_MISMATCH, CV_TITLE_NLP_EXEMPTION_HITS,
     TIER_1_COMPANIES, TIER_2_COMPANIES, TIER_3_COMPANIES, SERVICE_FIRMS,
     DISQUALIFYING_TITLES, ALIGNED_TITLES,
     PREFERRED_LOCATIONS, INDIA_LOCATIONS,
     INACTIVITY_HALF_LIFE_DAYS, MAX_NOTICE_PERIOD_DAYS, IDEAL_NOTICE_PERIOD_DAYS,
     IDEAL_YOE_MIN, IDEAL_YOE_MAX, HARD_MIN_YOE,
+    TITLE_CHASER_MIN_ROLES, TITLE_CHASER_MAX_AVG_TENURE_MONTHS,
 )
 
 
@@ -512,6 +515,54 @@ def compute_risk_features(candidate: Dict[str, Any]) -> Dict[str, float]:
         for r in career
     )
     features["is_consulting_only"] = float(all_service)
+
+    # Graded service share by tenure (drives the graded consulting penalty).
+    service_months = sum(
+        r.get("duration_months", 0) for r in career
+        if _classify_company(r.get("company", "")) == "service"
+    )
+    total_months = sum(r.get("duration_months", 0) for r in career)
+    features["service_ratio"] = service_months / total_months if total_months > 0 else 0.0
+
+    # Domain-mismatch: CV / speech / robotics evidence vs NLP/IR evidence. JD
+    # explicitly down-weights CV/speech/robotics-primary candidates who lack NLP/IR
+    # exposure. We read the VERIFIABLE WORK (headline, summary, career descriptions
+    # and titles) — NOT the skills array, which is where keyword-stuffing lives and
+    # which the challenge pointers warn against trusting. Score in [0,1]; 1 = off-domain.
+    work_text = " ".join([
+        profile.get("headline", ""), profile.get("summary", ""),
+        profile.get("current_title", ""),
+        " ".join(r.get("description", "") for r in career),
+        " ".join(r.get("title", "") for r in career),
+    ]).lower()
+    cv_hits = _keyword_score(work_text, CV_KEYWORDS + SPEECH_KEYWORDS + ROBOTICS_KEYWORDS)
+    nlp_hits = _keyword_score(work_text, NLP_IR_KEYWORDS)
+    if cv_hits >= 2 and (cv_hits + nlp_hits) > 0:
+        domain_mismatch = cv_hits / (cv_hits + nlp_hits)
+    else:
+        domain_mismatch = 0.0
+
+    # Explicit CV/speech/robotics current title → force strong mismatch, UNLESS the
+    # candidate also shows significant NLP/IR work (JD allows CV/speech background
+    # *with* NLP/IR exposure).
+    current_title_l = profile.get("current_title", "").lower()
+    if (any(t in current_title_l for t in CV_TITLE_TERMS)
+            and nlp_hits < CV_TITLE_NLP_EXEMPTION_HITS):
+        domain_mismatch = max(domain_mismatch, CV_TITLE_FORCED_MISMATCH)
+
+    features["domain_mismatch_score"] = domain_mismatch
+    features["cv_speech_keyword_hits"] = float(cv_hits)
+    features["nlp_ir_keyword_hits"] = float(nlp_hits)
+
+    # Title-chaser: many roles with short average tenure (hops for title).
+    durations = [r.get("duration_months", 0) for r in career]
+    n_roles = len(career)
+    avg_tenure = (sum(durations) / n_roles) if n_roles else 0.0
+    features["avg_tenure_months"] = float(avg_tenure)
+    features["is_title_chaser"] = float(
+        n_roles >= TITLE_CHASER_MIN_ROLES
+        and avg_tenure < TITLE_CHASER_MAX_AVG_TENURE_MONTHS
+    )
 
     # Profile age (older = more likely legitimate)
     signup_date = signals.get("signup_date")
