@@ -3,18 +3,18 @@ team_name: "HIREME"
 primary_contact:
   name: "Polavarapu Sri Suhas"
   email: "srisuhas12345@gmail.com"
-  phone: "+91-8340062039"        # REQUIRED — fill in before submitting (used for top-N outreach)
+  phone: "+91-8340062039" 
 
 team_members:
   - name: "Swayam Mohta"
     email: "mohtaswayam@gmail.com"
     role: "ML Engineer"
   - name: "Polavarapu Sri Suhas"
-    email: "srisuhas12345@gmail.com"  # REQUIRED — add the real email before submitting
+    email: "srisuhas12345@gmail.com"
     role: "ML Engineer"
 
 github_repo: "https://github.com/SwayamMohta/INDIA_RUNS_Hackathon"
-sandbox_link: "https://huggingface.co/spaces/suhas9545/redrob-ranker"  # §10.5 HuggingFace Space (Gradio), inference-only. Verified running. Docker fallback also in README.
+sandbox_link: "https://huggingface.co/spaces/suhas9545/redrob-ranker" 
 
 # Single command — features.parquet + ltr_model.txt are committed, so the ranking step
 # alone reproduces the full submission (BM25 index auto-rebuilt from --candidates, ~42s).
